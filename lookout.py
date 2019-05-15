@@ -41,7 +41,7 @@ class KubeLookout:
     ]
 
     def __init__(self, warning_image, progress_image, ok_image,
-                 slack_key, slack_channel, cluster_name):
+                 slack_key, slack_channel, cluster_name, filter_list):
         super().__init__()
         self.warning_image = warning_image
         self.ok_image = ok_image
@@ -52,6 +52,7 @@ class KubeLookout:
         self.cluster_name = cluster_name
         self.rollouts = {}
         self.degraded = set()
+        self.filter_list = filter_list
 
     def _init_client(self):
         if "KUBERNETES_PORT" in os.environ:
@@ -127,7 +128,8 @@ class KubeLookout:
             print("Waiting for deployment events to come in..")
             for event in stream:
                 deployment = event['object']
-                self._handle_event(deployment)
+                if any(deployment.metadata.name in f for f in filter_list):
+                    self._handle_event(deployment)
 
     def _generate_deployment_rollout_block(self, deployment,
                                            rollout_complete=False):
@@ -204,6 +206,7 @@ class KubeLookout:
 
 
 if __name__ == "__main__":
+    env_filter_list = = os.environ.get("FILTER_LIST", "").split(";")
     env_warning_image = os.environ.get(
         "WARNING_IMAGE",
         "https://upload.wikimedia.org/wikipedia/"
@@ -221,6 +224,6 @@ if __name__ == "__main__":
     kube_deploy_watch = KubeLookout(env_warning_image,
                                     env_progress_image,
                                     env_ok_image, env_slack_token,
-                                    env_slack_channel, env_cluster_name)
+                                    env_slack_channel, env_cluster_name, env_filter_list)
 
     kube_deploy_watch.main_loop()
